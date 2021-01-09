@@ -1,10 +1,11 @@
 package workerpool
 
 import (
-	"fmt"
 	"sync"
 
+	l "github.com/go-windmill/logger"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // Task is
@@ -43,7 +44,7 @@ type WorkerPool struct {
 
 // Start is
 func (w *WorkerPool) Start(count int) {
-	fmt.Println("Starting workers", count)
+	l.Log.Debug("Starting workers", zap.Int("count", count))
 	for i := 0; i < count; i++ {
 		w.WaitGroup.Add(1)
 		w.State.Workers.Started++
@@ -60,7 +61,7 @@ func (w *WorkerPool) Start(count int) {
 
 // Stop is
 func (w *WorkerPool) Stop(count int) {
-	fmt.Println("Stopping workers", count)
+	l.Log.Debug("Stopping workers", zap.Int("count", count))
 
 	// exit i number of items
 	for i := 0; i < count; i++ {
@@ -78,13 +79,16 @@ func (w *WorkerPool) Add(task func()) {
 	// task is real and there is a worker running
 	if task != nil && w.State.Workers.Started > 0 {
 		t := Task{ID: uuid.New(), F: task, Namspace: w.Namespace}
-		fmt.Println("Adding a task", t)
+		l.Log.Debug("Adding task",
+			zap.String("uuid", t.ID.String()),
+			zap.String("namespace", t.Namspace))
 		w.Queue <- t
 	}
 }
 
 // CloseAndWait is
 func (w *WorkerPool) CloseAndWait() {
+	l.Log.Debug("Closing and waiting")
 	close(w.Queue)
 	w.WaitGroup.Wait()
 }
@@ -117,19 +121,29 @@ func worker(
 
 	defer wg.Done()
 	for {
-		fmt.Printf("[%s:%d] worker waiting\n", namespace, index)
+		l.Log.Debug("Worker starting",
+			zap.String("namespace", namespace),
+			zap.Int("worker", index))
+
 		select {
 		case task, ok := <-tasks:
 			if !ok {
-				fmt.Printf("[%s:%d] no task, quiting\n", namespace, index)
+				l.Log.Warn("Worker exiting - no task",
+					zap.String("namespace", namespace),
+					zap.Int("worker", index))
 				state.Workers.Stopped++
 				return
 			}
-			fmt.Printf("[%s:%d][%s:%s] worker has recieved task\n", namespace, index, task.Namspace, task.ID)
+			l.Log.Info("Worker recieved task",
+				zap.String("namespace", namespace),
+				zap.Int("worker", index),
+				zap.String("task", task.ID.String()))
 			task.F()
 			state.Tasks.Counter++
 		case <-quit:
-			fmt.Printf("[%s:%d] worker has quit\n", namespace, index)
+			l.Log.Warn("Worker quiting from notification",
+				zap.String("namespace", namespace),
+				zap.Int("worker", index))
 			state.Workers.Stopped++
 			return
 
