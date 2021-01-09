@@ -28,6 +28,10 @@ Starting, Stopping and Adding updates the `WorkerPool` state information which t
 
 There is also a `Running()` method exposed to provide a counter of active worker pools
 
+## Logging
+
+`WorkerPool` uses a [logging tool](https://github.com/go-windmill/logger) based on [zap](https://github.com/uber-go/zap). By default, this logger only shows errors, but that can be changed by adjusting the log level
+
 ## Examples
 
 Examples of using the `WorkerPool`
