@@ -3,11 +3,21 @@ package workerpool
 import (
 	"log"
 	"math/rand"
+	"strconv"
+	"strings"
 	"testing"
 )
 
+type testStruct struct {
+	F string
+}
+
 func testFuncWithPointer(i *int) {
 	*i++
+}
+
+func testStructOutput(t *testStruct) {
+	t.F = t.F + "-done"
 }
 
 func Test_New_Returned(t *testing.T) {
@@ -115,7 +125,7 @@ func Test_Add_Simple(t *testing.T) {
 
 func Test_Add_With_ExpandingPool(t *testing.T) {
 	t.Parallel()
-	p := New("textExpanding")
+	p := New("testExpanding")
 
 	x := 0
 	workers := 2
@@ -145,4 +155,37 @@ func Test_Add_With_ExpandingPool(t *testing.T) {
 		log.Fatalf("Task counter does not match. Expected %v, got %v\n", tasks, p.State.Tasks.Counter)
 	}
 
+}
+
+func Test_Add_With_StructAndFunc(t *testing.T) {
+
+	t.Parallel()
+	p := New("testStructFunc")
+	workers := 5
+	tasks := 100
+	structs := make([]testStruct, 0)
+
+	for i := 0; i < tasks; i++ {
+		structs = append(structs, testStruct{F: "is-" + strconv.Itoa(i)})
+	}
+
+	p.Start(workers)
+	for i := 0; i < len(structs); i++ {
+		s := &structs[i]
+		p.Add(func() {
+			testStructOutput(s)
+		})
+	}
+
+	p.CloseAndWait()
+	doneCount := 0
+	for _, d := range structs {
+		if strings.Contains(d.F, "-done") {
+			doneCount++
+		}
+	}
+
+	if doneCount != tasks {
+		log.Fatalln("Manipulation of struct property failed")
+	}
 }
