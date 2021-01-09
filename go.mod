@@ -1,4 +1,4 @@
-module workerpool
+module github.com/go-windmill/workerpool
 
 go 1.14
 
