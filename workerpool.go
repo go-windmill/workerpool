@@ -8,31 +8,39 @@ import (
 	"go.uber.org/zap"
 )
 
-// Task is
+// Task is a struct providing a small wrapper around
+// the func added to the Queue
+// Provides an ID for tracking and namespace for
+// separation
 type Task struct {
 	ID       uuid.UUID
 	F        func()
 	Namspace string
 }
 
-// Workers is
+// Workers provides some state data for the pool
 type Workers struct {
 	Started int
 	Stopped int
 }
 
-// Tasks is
+// Tasks provides a counter to track amount processed
 type Tasks struct {
 	Counter int
 }
 
-// State is
+// State provides Worker and Task tracking data
 type State struct {
 	Workers Workers
 	Tasks   Tasks
 }
 
-// WorkerPool is
+// WorkerPool has a namespace (for easier logging),
+// State data for external tracking and access to
+// WaitGroup and Mutex
+// Queue chan is where tasks are added onto for
+// the pool to process
+// Exit handles exit signals to stop a worker
 type WorkerPool struct {
 	Namespace string
 	State     State
@@ -42,7 +50,9 @@ type WorkerPool struct {
 	Queue     chan Task
 }
 
-// Start is
+// Start creates a pool of `count` workers and updates state
+// The `worker` gets state data passed in as well as access
+// to the chan
 func (w *WorkerPool) Start(count int) {
 	l.Log.Debug("Starting workers", zap.Int("count", count))
 	for i := 0; i < count; i++ {
@@ -59,7 +69,8 @@ func (w *WorkerPool) Start(count int) {
 	}
 }
 
-// Stop is
+// Stop uses the Exit chan to cause `count` workers to return
+// and stop
 func (w *WorkerPool) Stop(count int) {
 	l.Log.Debug("Stopping workers", zap.Int("count", count))
 
@@ -69,12 +80,14 @@ func (w *WorkerPool) Stop(count int) {
 	}
 }
 
-// Running is
+// Running returns count of active workers
 func (w *WorkerPool) Running() int {
 	return w.State.Workers.Started - w.State.Workers.Stopped
 }
 
-// Add is
+// Add pushes the func() passed on to a chan for the worker pool
+// to process
+// Applies some meta data to the task (id for tracking and namespace)
 func (w *WorkerPool) Add(task func()) {
 	// task is real and there is a worker running
 	if task != nil && w.State.Workers.Started > 0 {
@@ -86,14 +99,15 @@ func (w *WorkerPool) Add(task func()) {
 	}
 }
 
-// CloseAndWait is
+// CloseAndWait closes the queue and waits for the wait WaitGroup
+// to finish
 func (w *WorkerPool) CloseAndWait() {
 	l.Log.Debug("Closing and waiting")
 	close(w.Queue)
 	w.WaitGroup.Wait()
 }
 
-// New is
+// New generates new struct but does not start a worker pool
 func New(namespace string) *WorkerPool {
 	var wg sync.WaitGroup
 
